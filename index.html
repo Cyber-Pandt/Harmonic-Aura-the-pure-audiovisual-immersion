@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harmonic Aura | Cinematic Sound Lab</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Three.js for 3D Graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyan: { 400: '#00F2FE', 500: '#4FACFE' },
+                        magenta: { 500: '#FF0055' },
+                        dark: '#05020a',
+                        surface: '#10101A'
+                    },
+                    fontFamily: {
+                        display: ['Orbitron', 'sans-serif'],
+                        mono: ['Roboto Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #05020a;
+            color: white;
+            overflow: hidden; 
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        /* 3D Canvas Background */
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Cinematic Vignette - Focuses the eyes */
+        .vignette {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(5,2,10,1) 100%);
+            pointer-events: none;
+            z-index: 2;
+            transition: background 1s ease;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Auto-hide UI for cinematic mode */
+        .ui-hidden {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+
+        /* Re-enable pointer events for interactive elements */
+        .interactive {
+            pointer-events: auto;
+        }
+
+        /* Glassmorphism Styles */
+        .glass-panel {
+            background: rgba(16, 16, 26, 0.3);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        /* Glitch Logo Effect */
+        .glitch-text {
+            position: relative;
+            display: inline-block;
+        }
+        .glitch-text::before, .glitch-text::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0.8;
+        }
+        .glitch-text::before { left: 2px; text-shadow: -1px 0 #FF0055; clip: rect(24px, 550px, 90px, 0); animation: glitch-anim 2s infinite linear alternate-reverse; }
+        .glitch-text::after { left: -2px; text-shadow: -1px 0 #00F2FE; clip: rect(85px, 550px, 140px, 0); animation: glitch-anim 2.5s infinite linear alternate-reverse; }
+
+        @keyframes glitch-anim {
+            0% { clip: rect(10px, 9999px, 44px, 0); }
+            20% { clip: rect(80px, 9999px, 92px, 0); }
+            40% { clip: rect(43px, 9999px, 12px, 0); }
+            60% { clip: rect(5px, 9999px, 63px, 0); }
+            80% { clip: rect(74px, 9999px, 22px, 0); }
+            100% { clip: rect(23px, 9999px, 88px, 0); }
+        }
+
+        /* Audio Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 12px; width: 12px;
+            border-radius: 50%;
+            background: #ff0077;
+            cursor: pointer;
+            margin-top: -4px;
+            box-shadow: 0 0 10px #ff0077;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Graphics Container -->
+    <div id="canvas-container"></div>
+    
+    <!-- Cinematic Vignette -->
+    <div id="vignette-layer" class="vignette"></div>
+
+    <!-- UI Overlay Layer -->
+    <div id="ui-layer" class="p-6 md:p-10 transition-opacity duration-1000 ease-in-out">
+        
+        <!-- TOP HEADER AREA -->
+        <header class="flex flex-col items-center relative w-full">
+            
+            <!-- Creator Logo (Centered) -->
+            <div class="z-20 text-center mb-6 mt-2 md:mt-0">
+                <h1 class="text-xl md:text-2xl font-display font-bold leading-none mb-1"><span class="bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">HP</span></h1>
+                <p class="text-[8px] md:text-[10px] text-gray-400 tracking-[0.3em] uppercase">Harsh Pandit</p>
+            </div>
+
+            <!-- Central Titles -->
+            <div class="text-center z-20">
+                <h2 class="text-2xl md:text-4xl font-display font-bold mb-1"><span class="bg-gradient-to-r from-pink-500 via-purple-400 to-cyan-400 bg-clip-text text-transparent">Harmonic Aura.</span></h2>
+                <p class="text-xs text-gray-400 tracking-[0.3em] uppercase mt-2">Pure Audiovisual Immersion</p>
+            </div>
+        </header>
+
+        <!-- MIDDLE AREA (Side Panels Removed for clean cinematic view) -->
+        <div class="flex-grow"></div>
+
+        <!-- BOTTOM AREA (Unified Control & Visualization Dock) -->
+        <div class="w-full interactive mt-auto pb-2 flex justify-center">
+            <div class="glass-panel rounded-3xl p-4 md:p-6 w-full max-w-5xl flex flex-col gap-5 relative overflow-hidden group">
+                <!-- Decorative light sweep -->
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[sweep_3s_infinite] pointer-events-none"></div>
+
+                <!-- Top Row: Visualizer Mode Selectors -->
+                <div class="flex flex-wrap justify-center gap-2 z-10 w-full">
+                    <button id="btn-mode-0" class="flex-1 min-w-[100px] glass-panel border border-cyan-500/50 text-cyan-400 px-3 py-2 rounded-xl text-[10px] md:text-xs font-bold tracking-widest uppercase hover:bg-cyan-500/20 transition shadow-[0_0_15px_rgba(0,242,254,0.2)] bg-cyan-500/10">❂ Quantum</button>
+                    <button id="btn-mode-1" class="flex-1 min-w-[100px] glass-panel border border-red-500/50 text-red-400 px-3 py-2 rounded-xl text-[10px] md:text-xs font-bold tracking-widest uppercase hover:bg-red-500/20 transition opacity-60 hover:opacity-100">❤️ Romance</button>
+                    <button id="btn-mode-2" class="flex-1 min-w-[100px] glass-panel border border-green-500/50 text-green-400 px-3 py-2 rounded-xl text-[10px] md:text-xs font-bold tracking-widest uppercase hover:bg-green-500/20 transition opacity-60 hover:opacity-100">🕺 Rave</button>
+                    <button id="btn-mode-3" class="flex-1 min-w-[100px] glass-panel border border-pink-500/50 text-pink-400 px-3 py-2 rounded-xl text-[10px] md:text-xs font-bold tracking-widest uppercase hover:bg-pink-500/20 transition opacity-60 hover:opacity-100">✧ Aura</button>
+                </div>
+
+                <!-- Bottom Row: Playback & Controls -->
+                <div class="flex flex-col md:flex-row items-center gap-4 z-10 w-full">
+                    <!-- Play/Pause -->
+                    <button id="play-btn" class="w-10 h-10 shrink-0 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 hover:scale-110 flex items-center justify-center text-white transition shadow-[0_0_15px_rgba(255,0,119,0.5)] border border-white/20">
+                        <svg id="icon-play" class="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <svg id="icon-pause" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    </button>
+                    
+                    <!-- Progress Bar & Track Info -->
+                    <div class="flex-grow flex flex-col justify-center relative w-full min-w-[150px] mt-3 md:mt-0">
+                        <span id="track-name" class="text-[10px] text-gray-400 truncate absolute -top-5 w-full text-center md:text-left">Awaiting audio connection...</span>
+                        <input type="range" id="progress-bar" value="0" min="0" max="100" class="w-full">
+                    </div>
+
+                    <!-- Frequency Data Readouts -->
+                    <div class="hidden md:flex gap-4 text-[10px] text-center font-mono tracking-widest shrink-0">
+                        <div class="flex flex-col"><span class="text-pink-500">BASS</span><span id="val-bass" class="text-gray-300">--</span></div>
+                        <div class="flex flex-col"><span class="text-purple-400">MID</span><span id="val-mid" class="text-gray-300">--</span></div>
+                        <div class="flex flex-col"><span class="text-cyan-400">HIGH</span><span id="val-high" class="text-gray-300">--</span></div>
+                    </div>
+
+                    <!-- Upload Button -->
+                    <label class="cursor-pointer bg-white/5 hover:bg-pink-500/20 border border-pink-500/30 text-pink-400 px-5 py-2.5 rounded-xl text-[10px] md:text-xs transition font-bold whitespace-nowrap shadow-[0_0_15px_rgba(255,0,85,0.2)] shrink-0 w-full md:w-auto text-center mt-2 md:mt-0">
+                        [ UPLOAD MP3 ]
+                        <input type="file" id="audio-upload" accept="audio/*" class="hidden" />
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Audio Element -->
+    <audio id="audio-player" crossorigin="anonymous"></audio>
+
+    <script>
+        /**
+         * HARMONIC AURA: CINEMATIC SOUND LAB
+         * Organic, Lovable 3D Audio Visualizer using Three.js & Web Audio API
+         */
+
+        // --- 1. WEB AUDIO API SETUP ---
+        let audioContext;
+        let analyser;
+        let dataArray;
+        const audioElement = document.getElementById('audio-player');
+        let isAudioSetup = false;
+
+        function setupAudio() {
+            if (isAudioSetup) return;
+            
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioContext = new AudioContext();
+            
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 512; // Smoothing resolution
+            analyser.smoothingTimeConstant = 0.85; // Natural smooth decay of audio values
+            
+            const source = audioContext.createMediaElementSource(audioElement);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+            
+            const bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+            
+            isAudioSetup = true;
+        }
+
+        // --- 2. UI & AUTO-HIDE LOGIC ---
+        const uploadBtn = document.getElementById('audio-upload');
+        const playBtn = document.getElementById('play-btn');
+        const iconPlay = document.getElementById('icon-play');
+        const iconPause = document.getElementById('icon-pause');
+        const trackName = document.getElementById('track-name');
+        const progressBar = document.getElementById('progress-bar');
+        
+        const valBass = document.getElementById('val-bass');
+        const valMid = document.getElementById('val-mid');
+        const valHigh = document.getElementById('val-high');
+
+        // Cinematic Auto-Hide UI
+        let mouseTimeout;
+        const uiLayer = document.getElementById('ui-layer');
+        
+        function resetUIHideTimer(delay = 700) { // Reduced default hide time to 0.7s
+            uiLayer.classList.remove('ui-hidden');
+            document.body.style.cursor = 'default';
+            clearTimeout(mouseTimeout);
+            
+            // Only hide if music is actually playing
+            mouseTimeout = setTimeout(() => {
+                if(!audioElement.paused && audioElement.src) {
+                    uiLayer.classList.add('ui-hidden');
+                    document.body.style.cursor = 'none'; // Hide cursor too!
+                }
+            }, delay); 
+        }
+
+        window.addEventListener('mousemove', () => resetUIHideTimer(700));
+        window.addEventListener('click', () => resetUIHideTimer(700));
+        window.addEventListener('touchstart', () => resetUIHideTimer(700));
+
+        // Audio Controls
+        uploadBtn.addEventListener('change', function(e) {
+            const file = this.files[0];
+            if (file) {
+                const objectUrl = URL.createObjectURL(file);
+                audioElement.src = objectUrl;
+                trackName.innerText = file.name;
+                
+                if (!isAudioSetup) setupAudio();
+                if (audioContext.state === 'suspended') audioContext.resume();
+                audioElement.play();
+                togglePlayUI(true);
+                resetUIHideTimer(200); // Hide immediately when track starts
+            }
+        });
+
+        playBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent window click from overriding the fast hide
+            if (!audioElement.src) {
+                alert("Please upload an MP3 track first to begin the immersion.");
+                return;
+            }
+            if (!isAudioSetup) setupAudio();
+            if (audioContext.state === 'suspended') audioContext.resume();
+
+            if (audioElement.paused) {
+                audioElement.play();
+                togglePlayUI(true);
+                resetUIHideTimer(200); // Hide immediately when playing
+            } else {
+                audioElement.pause();
+                togglePlayUI(false);
+                // Force UI to show when paused
+                uiLayer.classList.remove('ui-hidden');
+                document.body.style.cursor = 'default';
+                clearTimeout(mouseTimeout);
+            }
+        });
+
+        function togglePlayUI(isPlaying) {
+            if (isPlaying) {
+                iconPlay.classList.add('hidden');
+                iconPause.classList.remove('hidden');
+            } else {
+                iconPlay.classList.remove('hidden');
+                iconPause.classList.add('hidden');
+            }
+        }
+
+        audioElement.addEventListener('timeupdate', () => {
+            if(audioElement.duration) {
+                progressBar.value = (audioElement.currentTime / audioElement.duration) * 100;
+            }
+        });
+
+        progressBar.addEventListener('input', (e) => {
+            if(audioElement.duration) {
+                audioElement.currentTime = (e.target.value / 100) * audioElement.duration;
+            }
+        });
+
+
+        // --- 3. THREE.JS "HARMONIC AURA" ENGINE ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0514);
+        // Deep, romantic cosmic violet fog
+        scene.fog = new THREE.FogExp2(0x0a0514, 0.025);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 15, 30);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio for performance
+        container.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+        scene.add(ambientLight);
+
+        // Core Heartbeat Light
+        const pointLight = new THREE.PointLight(0xff0055, 2, 70);
+        pointLight.position.set(0, 4, 0);
+        scene.add(pointLight);
+
+        // Edge rim light
+        const edgeLight = new THREE.PointLight(0x00F2FE, 1.5, 60);
+        edgeLight.position.set(20, 10, 20);
+        scene.add(edgeLight);
+
+        // --- MULTIPLE VISUALIZER MODES SETUP ---
+        const mandalaGroup = new THREE.Group();
+        const quantumGroup = new THREE.Group();
+        const romanticGroup = new THREE.Group();
+        const romanticStaticGroup = new THREE.Group(); // For the bottom bars
+        const raveGroup = new THREE.Group(); // Mode 3: Dancing Crowd
+        
+        scene.add(mandalaGroup, quantumGroup, romanticGroup, raveGroup); 
+        scene.add(camera); // Add camera to the scene to render its children
+        camera.add(romanticStaticGroup); // Attach bars directly to the camera (creates a fixed 2D HUD effect)
+
+        mandalaGroup.visible = false;
+        romanticGroup.visible = false;
+        romanticStaticGroup.visible = false;
+        raveGroup.visible = false;
+
+        let currentMode = 0;
+        
+        const btnMode0 = document.getElementById('btn-mode-0');
+        const btnMode1 = document.getElementById('btn-mode-1');
+        const btnMode2 = document.getElementById('btn-mode-2');
+        const btnMode3 = document.getElementById('btn-mode-3');
+
+        function setMode(mode) {
+            currentMode = mode;
+            quantumGroup.visible = (mode === 0);
+            romanticGroup.visible = (mode === 1);
+            romanticStaticGroup.visible = (mode === 1);
+            raveGroup.visible = (mode === 2);
+            mandalaGroup.visible = (mode === 3);
+
+            // Update UI Tabs
+            const buttons = [btnMode0, btnMode1, btnMode2, btnMode3];
+            const colors = ['cyan', 'red', 'green', 'pink'];
+            
+            buttons.forEach((btn, i) => {
+                const isActive = mode === i;
+                const color = colors[i];
+                btn.classList.toggle('opacity-60', !isActive);
+                btn.classList.toggle(`bg-${color}-500/10`, isActive);
+                
+                // Tailwind dynamic classes sometimes need explicit shadow definitions, doing it inline for safety
+                if (isActive) {
+                    btn.style.boxShadow = `0 0 15px var(--tw-shadow-color)`;
+                    if(i===0) btn.style.setProperty('--tw-shadow-color', 'rgba(0,242,254,0.3)');
+                    if(i===1) btn.style.setProperty('--tw-shadow-color', 'rgba(255,0,0,0.3)');
+                    if(i===2) btn.style.setProperty('--tw-shadow-color', 'rgba(0,255,0,0.3)');
+                    if(i===3) btn.style.setProperty('--tw-shadow-color', 'rgba(255,0,85,0.3)');
+                } else {
+                    btn.style.boxShadow = 'none';
+                }
+            });
+        }
+
+        btnMode0.addEventListener('click', () => setMode(0));
+        btnMode1.addEventListener('click', () => setMode(1));
+        btnMode2.addEventListener('click', () => setMode(2));
+        btnMode3.addEventListener('click', () => setMode(3));
+
+        // 1. MODE 0: The Beating Heart (Center of Aura)
+        const heartGeo = new THREE.SphereGeometry(1.5, 32, 32);
+        const heartMat = new THREE.MeshStandardMaterial({
+            color: 0xff0055, emissive: 0xff0033, emissiveIntensity: 0.6,
+            roughness: 0.2, metalness: 0.8
+        });
+        const heart = new THREE.Mesh(heartGeo, heartMat);
+        mandalaGroup.add(heart);
+
+        // Magical Wireframe Cage around the heart
+        const cageGeo = new THREE.IcosahedronGeometry(2.2, 1);
+        const cageMat = new THREE.MeshStandardMaterial({
+            color: 0xff88aa, emissive: 0xff0077, emissiveIntensity: 0.8, wireframe: true, transparent: true, opacity: 0.8
+        });
+        const cage = new THREE.Mesh(cageGeo, cageMat);
+        mandalaGroup.add(cage);
+
+        // 2. The Organic Radial Crystals (Flower Petals)
+        const crystals = [];
+        const numRings = 14; 
+        
+        // Base geometry for smooth light pillars (Changed to 6 sides so you can see them spinning!)
+        const crystalGeo = new THREE.CylinderGeometry(0.25, 0.4, 1, 6);
+        crystalGeo.translate(0, 0.5, 0); // Pivot from the bottom base
+
+        for (let r = 1; r <= numRings; r++) {
+            const radius = r * 1.8 + 1.2; // Spacing from center
+            const numCrystalsInRing = r * 6; 
+            
+            for (let i = 0; i < numCrystalsInRing; i++) {
+                const angle = (i / numCrystalsInRing) * Math.PI * 2;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                
+                // Sunset Gradient: Magenta Core -> Deep Purple -> Cyan Edge
+                const hue = 0.95 - (r / numRings) * 0.45; 
+                const color = new THREE.Color().setHSL(hue, 0.85, 0.6);
+
+                const crystalMat = new THREE.MeshStandardMaterial({ 
+                    color: color,
+                    roughness: 0.1,
+                    metalness: 0.9,
+                    emissive: color,
+                    emissiveIntensity: 0.1,
+                    transparent: true,
+                    opacity: 0.9
+                });
+
+                const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+                crystal.position.set(x, 0, z);
+                
+                // Store structural data for fluid animation math
+                crystal.userData = {
+                    ring: r,
+                    angle: angle
+                };
+                
+                mandalaGroup.add(crystal);
+                crystals.push(crystal);
+            }
+        }
+
+        // 3. Audio-Reactive Cosmic Stars (Upper Region)
+        const auraStars = [];
+        const starGeo = new THREE.OctahedronGeometry(0.2, 0); // Sharp diamond-like stars
+        
+        for (let i = 0; i < 150; i++) {
+            // Match the sunset gradient of the crystals (Pink -> Purple -> Cyan)
+            const hue = 0.95 - Math.random() * 0.45; 
+            const starMat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color().setHSL(hue, 0.9, 0.6),
+                emissive: new THREE.Color().setHSL(hue, 0.9, 0.4),
+                roughness: 0.1, metalness: 0.8,
+                transparent: true, opacity: 0.9
+            });
+            const star = new THREE.Mesh(starGeo, starMat);
+            
+            // Scatter them in a large cylinder high above the main aura
+            const radius = 2 + Math.random() * 20;
+            const theta = Math.random() * Math.PI * 2;
+            const y = 12 + Math.random() * 25; // Floating high up (Y: 12 to 37)
+            
+            star.position.set(Math.cos(theta)*radius, y, Math.sin(theta)*radius);
+            
+            // Randomize their starting rotation
+            star.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+
+            star.userData = {
+                baseY: y,
+                angle: theta,
+                radius: radius,
+                speed: 0.002 + Math.random() * 0.008,
+                freqBin: Math.floor(Math.random() * 120) // Reacts to Bass through Mid-Highs
+            };
+            
+            mandalaGroup.add(star);
+            auraStars.push(star);
+        }
+
+        // ==========================================
+        // 2. MODE 1: QUANTUM SPHERE SETUP
+        // ==========================================
+        const qCrystals = [];
+        const qCount = 500;
+        const qGeo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+        const goldenRatio = (1 + Math.sqrt(5)) / 2;
+        
+        for (let i = 0; i < qCount; i++) {
+            const t = i / (qCount - 1);
+            const phi = Math.acos(1 - 2 * t);
+            const theta = 2 * Math.PI * i / goldenRatio;
+            
+            const x = Math.sin(phi) * Math.cos(theta);
+            const y = Math.sin(phi) * Math.sin(theta);
+            const z = Math.cos(phi);
+            
+            const hue = 0.55 + (y * 0.25); // Cyan to Purple Gradient
+            const qMat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color().setHSL(hue, 0.9, 0.6),
+                emissive: new THREE.Color().setHSL(hue, 0.9, 0.3),
+                roughness: 0.1, metalness: 0.8
+            });
+            
+            const mesh = new THREE.Mesh(qGeo, qMat);
+            mesh.userData = { dir: new THREE.Vector3(x, y, z), id: i };
+            mesh.position.copy(mesh.userData.dir.clone().multiplyScalar(5));
+            mesh.lookAt(0,0,0);
+            
+            quantumGroup.add(mesh);
+            qCrystals.push(mesh);
+        }
+
+        // ==========================================
+        // 3. MODE 2: CRIMSON ROMANCE SETUP
+        // ==========================================
+        const heartCoreGroup = new THREE.Group();
+        romanticGroup.add(heartCoreGroup);
+
+        const rParticles = [];
+        const rCount = 800; // Increased count for perfect, dense shape
+        const rGeo = new THREE.SphereGeometry(0.25, 16, 16); // Slightly smaller balls for higher density
+        
+        for (let i = 0; i < rCount; i++) {
+            // Random distribution for a seamless, perfectly organic outline
+            const t = Math.random() * Math.PI * 2;
+            
+            // Perfect 2D Heart Math
+            const rawX = 16 * Math.pow(Math.sin(t), 3);
+            const rawY = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+            
+            // Plump 3D thickness (clustered towards the center)
+            const zNorm = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5; 
+            const z = zNorm * 2.5; 
+            
+            // Taper edges to make a beautifully rounded 3D heart, not a flat extrusion
+            const xyScale = 1 - Math.pow(Math.abs(zNorm), 2) * 0.25; 
+            const scale = 0.45;
+
+            const x = rawX * scale * xyScale;
+            const y = rawY * scale * xyScale + 6;
+            
+            const pos = new THREE.Vector3(x, y, z);
+
+            // Rich Crimson and Ruby Reds to contrast with the pink background
+            const hue = 0.95 + (Math.random() * 0.05); 
+            const rMat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color().setHSL(hue, 0.9, 0.4),
+                emissive: new THREE.Color().setHSL(hue, 0.9, 0.2),
+                roughness: 0.1, metalness: 0.4,
+                transparent: true, opacity: 0.95
+            });
+
+            const mesh = new THREE.Mesh(rGeo, rMat);
+            mesh.position.copy(pos);
+            
+            // Save local position relative to heart center to maintain perfect shape integrity
+            const center = new THREE.Vector3(0, 6, 0);
+            mesh.userData = { 
+                id: i,
+                center: center,
+                localPos: pos.clone().sub(center)
+            };
+            
+            heartCoreGroup.add(mesh);
+            rParticles.push(mesh);
+        }
+
+        // Add swirling floating mini-hearts (instead of generic petals)
+        const petals = [];
+        
+        // Custom 3D Heart Shape for particles
+        const heartShape = new THREE.Shape();
+        const hx = 0, hy = 0;
+        heartShape.moveTo( hx + 5, hy + 5 );
+        heartShape.bezierCurveTo( hx + 5, hy + 5, hx + 4, hy, hx, hy );
+        heartShape.bezierCurveTo( hx - 6, hy, hx - 6, hy + 7, hx - 6, hy + 7 );
+        heartShape.bezierCurveTo( hx - 6, hy + 11, hx - 3, hy + 15.4, hx + 5, hy + 19 );
+        heartShape.bezierCurveTo( hx + 12, hy + 15.4, hx + 16, hy + 11, hx + 16, hy + 7 );
+        heartShape.bezierCurveTo( hx + 16, hy + 7, hx + 16, hy, hx + 10, hy );
+        heartShape.bezierCurveTo( hx + 7, hy, hx + 5, hy + 5, hx + 5, hy + 5 );
+        
+        const petalGeo = new THREE.ShapeGeometry( heartShape );
+        petalGeo.center();
+        petalGeo.scale(0.04, 0.04, 0.04);
+        petalGeo.rotateZ(Math.PI); // Rotate upright
+
+        for(let i=0; i<150; i++) {
+            const pMat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color().setHSL(0.95 + Math.random()*0.05, 0.8, 0.5),
+                emissive: new THREE.Color().setHSL(0.95 + Math.random()*0.05, 0.8, 0.2),
+                side: THREE.DoubleSide,
+                transparent: true, opacity: 0.8
+            });
+            const petal = new THREE.Mesh(petalGeo, pMat);
+            
+            const r = 10 + Math.random() * 25; // Orbit radius
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            
+            petal.position.set(
+                r * Math.sin(phi) * Math.cos(theta),
+                r * Math.sin(phi) * Math.sin(theta) + 10,
+                r * Math.cos(phi)
+            );
+            
+            petal.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+            petal.userData = {
+                rotSpeed: new THREE.Vector3(Math.random()*0.05, Math.random()*0.05, Math.random()*0.05),
+                orbitSpeed: 0.001 + Math.random() * 0.003
+            };
+            romanticGroup.add(petal);
+            petals.push(petal);
+        }
+
+        // Add 3D Rectangular Crimson Bars to the absolute bottom of the screen (HUD)
+        const rBars = [];
+        const numBars = 128; // High count for a dense, edge-to-edge spectrum
+        const barGeo = new THREE.BoxGeometry(0.1, 1, 0.05); // Thin, sleek UI bars
+        barGeo.translate(0, 0.5, 0); // Scale perfectly from the bottom up
+
+        const totalWidth = 18; // Extremely wide to guarantee edge-to-edge coverage even on ultrawide monitors
+        const startX = -totalWidth / 2;
+        const stepX = totalWidth / (numBars - 1);
+
+        for(let i=0; i<numBars; i++) {
+            // Arrange in a perfectly straight horizontal line
+            const x = startX + i * stepX;
+            
+            // Vibrant glowing color to ignore shadows and always pop
+            const hue = 0.95 + (Math.random() * 0.05); 
+            const bMat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color().setHSL(hue, 0.9, 0.2), // Dark core
+                emissive: new THREE.Color().setHSL(hue, 0.9, 0.6), // Bright glowing edge
+                roughness: 0.1, metalness: 0.2,
+                transparent: true, opacity: 0.85
+            });
+
+            const bar = new THREE.Mesh(barGeo, bMat);
+            bar.position.set(x, 0, 0); 
+            romanticStaticGroup.add(bar);
+            rBars.push(bar);
+        }
+        
+        // Pin the group super close to the camera, exactly touching the bottom visual bound
+        // This ensures they NEVER rotate, and perfectly hug the bottom of your monitor
+        romanticStaticGroup.position.set(0, -2.85, -5);
+
+        // ==========================================
+        // 4. MODE 3: NEON RAVE CROWD
+        // ==========================================
+        const dancers = [];
+        
+        // Factory function to create a stylized dancer
+        function createDancer(x, z, hue) {
+            const dancer = new THREE.Group();
+            dancer.position.set(x, 0, z);
+
+            const mat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color().setHSL(hue, 1.0, 0.5),
+                emissive: new THREE.Color().setHSL(hue, 1.0, 0.2),
+                roughness: 0.2, metalness: 0.8
+            });
+
+            // Head
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), mat);
+            head.position.y = 2.4;
+            dancer.add(head);
+
+            // Body
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.2, 1.4), mat);
+            body.position.y = 1.3;
+            dancer.add(body);
+
+            // Arm/Leg geometry setup (Pivot from top)
+            const limbGeo = new THREE.CylinderGeometry(0.12, 0.08, 1.2);
+            limbGeo.translate(0, -0.6, 0); 
+
+            // Arms
+            const armL = new THREE.Mesh(limbGeo, mat);
+            armL.position.set(-0.5, 1.9, 0);
+            dancer.add(armL);
+
+            const armR = new THREE.Mesh(limbGeo, mat);
+            armR.position.set(0.5, 1.9, 0);
+            dancer.add(armR);
+
+            // Legs
+            const legL = new THREE.Mesh(limbGeo, mat);
+            legL.position.set(-0.2, 0.6, 0);
+            dancer.add(legL);
+
+            const legR = new THREE.Mesh(limbGeo, mat);
+            legR.position.set(0.2, 0.6, 0);
+            dancer.add(legR);
+
+            dancer.userData = { head, body, armL, armR, legL, legR, startX: x, startZ: z, hue: hue };
+            return dancer;
+        }
+
+        // Create a central dancing couple
+        const couple1 = createDancer(-1.5, 0, 0.95); // Pink
+        const couple2 = createDancer(1.5, 0, 0.5);  // Cyan
+        raveGroup.add(couple1, couple2);
+        dancers.push(couple1, couple2);
+
+        // Create the surrounding crowd in a grid
+        for(let i = -4; i <= 4; i+=2) {
+            for(let j = -4; j <= 4; j+=2) {
+                if((i===0 && j===0) || Math.abs(i) < 2 && Math.abs(j) < 2) continue; // Skip center
+                const hue = 0.3 + Math.random() * 0.4; // Greens/Blues
+                const crowdMember = createDancer(i * 2.2, j * 2.2, hue); // Re-centered completely onto the floor
+                raveGroup.add(crowdMember);
+                dancers.push(crowdMember);
+            }
+        }
+
+        // Upgraded Interactive LED Dance Floor
+        const raveTiles = [];
+        const floorGridGroup = new THREE.Group();
+        const tileSize = 1.8;
+        for(let i = -7; i <= 7; i++) { // Expanded grid so everyone fits
+            for(let j = -7; j <= 7; j++) {
+                const tileGeo = new THREE.PlaneGeometry(tileSize * 0.9, tileSize * 0.9);
+                const tileMat = new THREE.MeshStandardMaterial({
+                    color: 0x111111, emissive: 0x000000, roughness: 0.1, metalness: 0.8
+                });
+                const tile = new THREE.Mesh(tileGeo, tileMat);
+                tile.rotation.x = -Math.PI / 2;
+                tile.position.set(i * tileSize, 0.02, j * tileSize);
+                tile.userData = { id: Math.abs(i) + Math.abs(j) }; // Distance from center
+                floorGridGroup.add(tile);
+                raveTiles.push(tile);
+            }
+        }
+        raveGroup.add(floorGridGroup);
+
+        // Surrounding DJ Speaker Boxes (Massive & Moved Off-Floor)
+        const speakers = [];
+        function createSpeaker(x, z, rotY) {
+            const spkGroup = new THREE.Group();
+            spkGroup.position.set(x, 4.5, z); // Raised due to scale
+            spkGroup.rotation.y = rotY;
+            spkGroup.scale.set(1.8, 1.8, 1.8); // Made 80% Bigger!
+
+            // Main Box
+            const boxGeo = new THREE.BoxGeometry(2.5, 5, 2);
+            const boxMat = new THREE.MeshStandardMaterial({color: 0x111111, roughness: 0.9});
+            const box = new THREE.Mesh(boxGeo, boxMat);
+            spkGroup.add(box);
+
+            // Big Bass Woofer
+            const wooferGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.2, 32);
+            wooferGeo.rotateX(Math.PI/2);
+            const wooferMat = new THREE.MeshStandardMaterial({color: 0x222222, emissive: 0x00ff00, emissiveIntensity: 0});
+            const woofer = new THREE.Mesh(wooferGeo, wooferMat);
+            woofer.position.set(0, -1, 1);
+            spkGroup.add(woofer);
+
+            // Mid Tweeter
+            const tweeterGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.2, 32);
+            tweeterGeo.rotateX(Math.PI/2);
+            const tweeter = new THREE.Mesh(tweeterGeo, wooferMat.clone());
+            tweeter.position.set(0, 1.2, 1);
+            spkGroup.add(tweeter);
+
+            raveGroup.add(spkGroup);
+            speakers.push({ woofer, tweeter });
+        }
+        // Placed safely out of the dance floor bounds
+        createSpeaker(-15, 0, Math.PI/4);
+        createSpeaker(15, 0, -Math.PI/4);
+
+        // Rave Lasers (Massive Upgrade!)
+        const lasers = [];
+        const numLasers = 24; // Quadrupled the amount of lasers
+        for(let i=0; i<numLasers; i++) {
+            const laserGeo = new THREE.CylinderGeometry(0.04, 0.04, 60, 8);
+            laserGeo.translate(0, 30, 0); // Pivot at base
+            const laserMat = new THREE.MeshBasicMaterial({ color: 0x00ffaa, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending });
+            const laser = new THREE.Mesh(laserGeo, laserMat);
+            
+            // Arrange in a giant arc around the back of the dance floor
+            const angle = (i / (numLasers - 1)) * Math.PI; 
+            const radius = 16;
+            laser.position.set(Math.cos(angle) * radius, 0, -Math.sin(angle) * radius - 2);
+            
+            raveGroup.add(laser);
+            lasers.push(laser);
+        }
+
+        // 6. Magical Floating Embers (Particles)
+        const particleGeo = new THREE.BufferGeometry();
+        const particleCount = 1500;
+        const posArray = new Float32Array(particleCount * 3);
+        const velocityArray = [];
+        for(let i=0; i < particleCount * 3; i+=3) {
+            posArray[i] = (Math.random() - 0.5) * 80; // x
+            posArray[i+1] = Math.random() * 30;       // y
+            posArray[i+2] = (Math.random() - 0.5) * 80; // z
+            velocityArray.push(0.01 + Math.random() * 0.04); // upward speed
+        }
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const particleMat = new THREE.PointsMaterial({
+            size: 0.15, color: 0xffaadd, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending
+        });
+        const particleMesh = new THREE.Points(particleGeo, particleMat);
+        scene.add(particleMesh);
+
+        // 4. Soft Reflective Floor
+        const floorGeo = new THREE.PlaneGeometry(200, 200);
+        const floorMat = new THREE.MeshStandardMaterial({ 
+            color: 0x05020a, roughness: 0.1, metalness: 0.8,
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -0.1; 
+        scene.add(floor);
+
+
+        // --- 4. ANIMATION & RENDER LOOP ---
+        let time = 0;
+        let prevBass = 0;
+        let cameraShake = 0;
+        let particleSpeedMult = 1;
+        let heartPulseTarget = 1.0;
+        let heartPulse = 1.0;
+        let heartRot = 0; // Cumulative rotation for ultra-fast beat spin
+
+        function animate() {
+            requestAnimationFrame(animate);
+            time += 0.005;
+
+            // Smooth Background Color Transitions per Mode
+            let targetBg;
+            let targetFloor;
+            if (currentMode === 0) { targetBg = new THREE.Color(0x020a10); targetFloor = new THREE.Color(0x01050a); }
+            else if (currentMode === 1) { targetBg = new THREE.Color(0xffb6c1); targetFloor = new THREE.Color(0xff99aa); } // Light Pink
+            else if (currentMode === 2) { targetBg = new THREE.Color(0x051a05); targetFloor = new THREE.Color(0x020a02); } // Rave Green
+            else if (currentMode === 3) { targetBg = new THREE.Color(0x0a0514); targetFloor = new THREE.Color(0x05020a); } // Aura
+
+            scene.background.lerp(targetBg, 0.03);
+            scene.fog.color.lerp(targetBg, 0.03);
+            floor.material.color.lerp(targetFloor, 0.03);
+
+            const vignetteLayer = document.getElementById('vignette-layer');
+            if(currentMode === 1) {
+                vignetteLayer.style.background = 'radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(255, 105, 180, 0.15) 100%)';
+            } else {
+                vignetteLayer.style.background = 'radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(5,2,10,1) 100%)';
+            }
+
+            let bassAvg = 0, midAvg = 0, highAvg = 0;
+
+            if (isAudioSetup && !audioElement.paused) {
+                analyser.getByteFrequencyData(dataArray);
+                
+                bassAvg = getAverage(dataArray, 0, 8);
+                midAvg = getAverage(dataArray, 9, 60);
+                highAvg = getAverage(dataArray, 61, 200);
+
+                // Gentle beat detection for the camera bob & PARTICLE BURST
+                if (bassAvg > 210 && (bassAvg - prevBass) > 10) {
+                    cameraShake = 0.6; // Softer, lovable bounce
+                    particleSpeedMult = 8.0; // Embers burst upwards intensely on beat drop!
+                    heartPulseTarget = 1.4 + (bassAvg/255) * 0.3; // Make the romantic heart pump!
+                }
+                prevBass = bassAvg;
+                
+                // Decay ember burst smoothly back to normal speed
+                particleSpeedMult += (1.0 - particleSpeedMult) * 0.05;
+                
+                // Springy Heartbeat Math for perfect "lub-dub" sync
+                heartPulseTarget += (1.0 - heartPulseTarget) * 0.1; 
+                heartPulse += (heartPulseTarget - heartPulse) * 0.25;
+
+                if(Math.random() > 0.85) { // Throttle UI updates
+                    valBass.innerText = Math.floor(bassAvg).toString().padStart(3, '0');
+                    valMid.innerText = Math.floor(midAvg).toString().padStart(3, '0');
+                    valHigh.innerText = Math.floor(highAvg).toString().padStart(3, '0');
+                }
+
+                if (currentMode === 0) {
+                    // --- MODE 0: QUANTUM SPHERE ANIMATION ---
+                    quantumGroup.rotation.y += 0.002;
+                    quantumGroup.rotation.x = Math.sin(time) * 0.2;
+                    
+                    qCrystals.forEach((q) => {
+                        const freqPercent = (q.userData.id % 100) / 100;
+                        const val = dataArray[Math.floor(freqPercent * 150)]; 
+                        
+                        // MASSIVE EXPLOSION MATH: Spheres fly far away with the beats
+                        const audioExpand = Math.pow((val / 255), 4) * 50; 
+                        const baseRadius = 5 + Math.sin(time * 3 + q.userData.id * 0.1) * 0.5;
+                        const beatPush = (bassAvg > 210) ? (bassAvg/255)*5 : 0; // Extra shove on drop
+
+                        const targetPos = q.userData.dir.clone().multiplyScalar(baseRadius + audioExpand + beatPush);
+                        
+                        // Slower lerp return makes them hang beautifully in the air
+                        q.position.lerp(targetPos, 0.08); 
+                        q.material.emissiveIntensity = 0.2 + (audioExpand * 0.15);
+                        
+                        const s = 1 + (val / 255) * 3; 
+                        q.scale.set(s, s, s);
+                    });
+                }
+                else if (currentMode === 1) {
+                    // --- MODE 1: CRIMSON ROMANCE ANIMATION ---
+                    // Slower, elegant rotation perfectly synced with the bass!
+                    heartRot += 0.004 + Math.pow((bassAvg / 255), 2) * 0.05; 
+                    romanticGroup.rotation.y = heartRot; 
+
+                    // The entire giant heart pulsates perfectly with the beat
+                    heartCoreGroup.scale.set(heartPulse, heartPulse, heartPulse);
+                    
+                    rParticles.forEach((p) => {
+                        const freqPercent = (p.userData.id % 100) / 100;
+                        const val = dataArray[Math.floor(freqPercent * 100)];
+                        
+                        // PERFECT INTEGRITY MATH: Scale the local position vector
+                        const expansion = Math.pow((val / 255), 2.5) * 0.4; 
+                        const targetPos = p.userData.center.clone().add(p.userData.localPos.clone().multiplyScalar(1 + expansion));
+                        
+                        p.position.lerp(targetPos, 0.25);
+
+                        const s = 1 + (val / 255) * 0.8;
+                        p.scale.set(s, s, s);
+
+                        p.material.emissiveIntensity = 0.2 + (val / 255) * 1.5;
+                    });
+
+                    // Mini Hearts (Petals) swirl and flutter intensely with the music
+                    petals.forEach((petal) => {
+                        petal.position.applyAxisAngle(new THREE.Vector3(0,1,0), petal.userData.orbitSpeed + (bassAvg/255)*0.015);
+                        
+                        petal.rotation.x += petal.userData.rotSpeed.x + (bassAvg/255)*0.1;
+                        petal.rotation.y += petal.userData.rotSpeed.y;
+                        petal.rotation.z += petal.userData.rotSpeed.z;
+                        
+                        petal.material.emissiveIntensity = 0.1 + (bassAvg / 255) * 0.5;
+                    });
+
+                    // Animate Bottom Crimson Rectangular Bars (Fixed HUD)
+                    rBars.forEach((bar, index) => {
+                        // Map index to frequency (Center bars = bass, outer bars = mid/high)
+                        const centerDist = Math.abs((index - (numBars/2)) / (numBars/2));
+                        const freqIndex = Math.floor((1 - centerDist) * (dataArray.length * 0.35));
+                        const val = dataArray[freqIndex];
+
+                        // Scaled specifically for the close-up camera distance so it doesn't overshoot
+                        const targetScale = Math.max(0.01, Math.pow((val / 255), 2.5) * 2.5);
+                        bar.scale.y += (targetScale - bar.scale.y) * 0.3; // Smooth snappy audio sync
+                        bar.material.emissiveIntensity = 0.4 + (val / 255) * 1.5;
+                    });
+                }
+                else if (currentMode === 2) {
+                    // --- MODE 2: NEON RAVE CROWD ANIMATION ---
+                    raveGroup.rotation.y = Math.sin(time * 0.5) * 0.1; // Gentle camera pan effect
+
+                    // Animate Interactive LED Dance Floor
+                    raveTiles.forEach((tile) => {
+                        const val = dataArray[Math.min(tile.userData.id * 2, dataArray.length - 1)];
+                        if (val > 140) {
+                            tile.material.emissive.setHSL((time * 0.2 + tile.userData.id * 0.05) % 1.0, 1.0, val/255);
+                        } else {
+                            tile.material.emissive.lerp(new THREE.Color(0x000000), 0.1);
+                        }
+                    });
+
+                    // Animate Speaker Woofers (Punching out on Bass)
+                    speakers.forEach((spk) => {
+                        const bassPunch = Math.pow((bassAvg/255), 3) * 1.5;
+                        const midPunch = Math.pow((midAvg/255), 2);
+                        
+                        spk.woofer.scale.y = 1 + bassPunch; // Cylinder rotated, Y is depth
+                        spk.woofer.material.emissiveIntensity = bassPunch * 2;
+                        
+                        spk.tweeter.scale.y = 1 + midPunch;
+                        spk.tweeter.material.emissiveIntensity = midPunch * 1.5;
+                    });
+
+                    // Sweep Lasers
+                    lasers.forEach((laser, i) => {
+                        // High frequencies make lasers whip insanely fast and intensely
+                        const intensity = Math.max(bassAvg, highAvg) / 255;
+                        laser.rotation.z = Math.sin(time * 6 + i * 0.5) * 2.0 * intensity; // Whip wildly
+                        laser.rotation.x = Math.cos(time * 3 + i * 0.2) * 0.5 + 0.3; // Angle forward over the crowd
+                        
+                        // Flash brightly with high frequency (Treble)
+                        laser.material.opacity = 0.1 + (highAvg/255) * 0.9; 
+                        
+                        // Color strobes based on the beat and time
+                        const hueShift = (time * 0.8 + i * 0.05 + (bassAvg/255)*0.5) % 1;
+                        laser.material.color.setHSL(hueShift, 1, 0.6);
+                    });
+
+                    // Animate Dancers
+                    dancers.forEach((dancer, index) => {
+                        const d = dancer.userData;
+                        const val = dataArray[Math.floor((index / dancers.length) * 50)]; // Map to lower/mid freqs
+                        
+                        // Jump on Bass
+                        const jumpHeight = Math.pow((bassAvg/255), 3) * 2.5;
+                        dancer.position.y += (jumpHeight - dancer.position.y) * 0.3;
+
+                        // Fist Pump / Dance moves on Mids
+                        const armSwing = Math.pow((val/255), 2) * Math.PI * 1.2; 
+                        d.armL.rotation.x = -armSwing; // Raise arms
+                        d.armL.rotation.z = Math.sin(time * 10 + index) * 0.5; // Wave them
+                        
+                        d.armR.rotation.x = -armSwing;
+                        d.armR.rotation.z = -Math.sin(time * 10 + index) * 0.5;
+
+                        // Head bobs on highs
+                        const headBob = Math.pow((highAvg/255), 2) * 0.6;
+                        d.head.scale.set(1 + headBob, 1 + headBob, 1 + headBob);
+
+                        // Legs bend when jumping
+                        d.legL.rotation.x = dancer.position.y * 0.5;
+                        d.legR.rotation.x = dancer.position.y * 0.5;
+
+                        // Pulse body glow with beat
+                        d.body.material.emissiveIntensity = 0.2 + (bassAvg/255) * 2;
+                    });
+                }
+                else if (currentMode === 3) {
+                    // --- MODE 3: HARMONIC AURA ANIMATION ---
+                    // 1. The Heartbeat (Core pulses)
+                    const coreScaleTarget = 1 + Math.pow(bassAvg / 255, 2.5) * 1.5;
+                    heart.scale.lerp(new THREE.Vector3(coreScaleTarget, coreScaleTarget, coreScaleTarget), 0.2);
+                    cage.scale.lerp(new THREE.Vector3(1 + (coreScaleTarget * 0.25), 1 + (coreScaleTarget * 0.25), 1 + (coreScaleTarget * 0.25)), 0.1);
+                    
+                    cage.rotation.y -= 0.01 + (bassAvg / 255) * 0.04;
+                    heart.rotation.x += 0.005;
+
+                    // 2. The Harmonic Ripple & Vortex Swirl
+                    // Speeds up the entire group rotation on the bass drop
+                    mandalaGroup.rotation.y += 0.001 + Math.pow(bassAvg / 255, 3) * 0.02; 
+
+                    crystals.forEach((crystal) => {
+                        const freqPercent = crystal.userData.ring / numRings;
+                        const freqIndex = Math.floor(freqPercent * (dataArray.length * 0.4)); 
+                        const val = dataArray[Math.min(freqIndex, dataArray.length - 1)];
+                        
+                        // The Magic Formula: Audio Height + Flowing Sine Waves
+                        const angularWave = Math.sin(crystal.userData.angle * 5 + time * 8) * 0.6; 
+                        const radialWave = Math.sin(crystal.userData.ring * 0.5 - time * 12) * 0.8; 
+                        
+                        const audioIntensity = Math.pow((val / 255), 2);
+                        const audioHeight = audioIntensity * 16;
+                        const targetY = Math.max(0.1, audioHeight + angularWave + radialWave);
+                        
+                        crystal.scale.y += (targetY - crystal.scale.y) * 0.3; // Faster Smooth Lerp
+                        
+                        // --- PERFECT ROTATION SYNC ---
+                        // 1. Bloom Outward: Calculate X and Z pitch to tilt the petal beautifully outward
+                        const targetTilt = audioIntensity * 1.2; 
+                        const tiltX = Math.sin(crystal.userData.angle) * targetTilt;
+                        const tiltZ = -Math.cos(crystal.userData.angle) * targetTilt;
+
+                        crystal.rotation.x += (tiltX - crystal.rotation.x) * 0.2;
+                        crystal.rotation.z += (tiltZ - crystal.rotation.z) * 0.2;
+
+                        // 2. Individual Spin: Twist the hexagonal pillar on its own axis
+                        crystal.rotation.y += (val / 255) * 0.15;
+
+                        crystal.material.emissiveIntensity = 0.1 + (crystal.scale.y / 15) * 0.8;
+                    });
+
+                    // 3. Dancing Upper Stars (Gravity Drops)
+                    auraStars.forEach((star) => {
+                        const val = dataArray[star.userData.freqBin];
+                        
+                        // Orbit the center, speeding up with the bass
+                        star.userData.angle += star.userData.speed * (1 + (bassAvg/255)*3);
+                        star.position.x = Math.cos(star.userData.angle) * star.userData.radius;
+                        star.position.z = Math.sin(star.userData.angle) * star.userData.radius;
+
+                        // "Drop" Sync: Music acts like gravity, pulling stars down heavily
+                        const dropAmount = Math.pow(val / 255, 2.5) * 16;
+                        const targetY = star.userData.baseY - dropAmount;
+                        
+                        // Smoothly fall and spring back up
+                        star.position.y += (targetY - star.position.y) * 0.15; 
+
+                        // Pop in scale and brightness on hits
+                        const s = 1 + Math.pow(val / 255, 2) * 2.5;
+                        star.scale.set(s, s, s);
+                        star.material.emissiveIntensity = 0.2 + (val/255) * 2;
+
+                        // Spin wildly on heavy hits
+                        star.rotation.x += 0.01 + (val/255)*0.15;
+                        star.rotation.y += 0.01 + (val/255)*0.15;
+                    });
+                }
+
+                pointLight.intensity = 1 + Math.pow((bassAvg / 255), 2) * 5;
+
+            } else {
+                particleSpeedMult = 1; // Reset to idle speed
+                
+                // Idle "Breathing" Animations per mode
+                heartPulseTarget = 1.0;
+                heartPulse += (1.0 + Math.sin(time * 3) * 0.05 - heartPulse) * 0.1;
+
+                if (currentMode === 0) {
+                    quantumGroup.rotation.y += 0.001;
+                    qCrystals.forEach((q) => {
+                        const baseRadius = 5 + Math.sin(time * 2 + q.userData.id * 0.05) * 0.8;
+                        const targetPos = q.userData.dir.clone().multiplyScalar(baseRadius);
+                        q.position.lerp(targetPos, 0.05);
+                        q.scale.set(1, 1, 1);
+                        q.material.emissiveIntensity = 0.2;
+                    });
+                } else if (currentMode === 1) {
+                    heartRot += 0.002; // Slower gentle idle spin
+                    romanticGroup.rotation.y = heartRot;
+                    
+                    heartCoreGroup.scale.set(heartPulse, heartPulse, heartPulse);
+                    
+                    rParticles.forEach((p) => {
+                        // Smoothly return to base perfect heart shape when idle
+                        const targetPos = p.userData.center.clone().add(p.userData.localPos);
+                        p.position.lerp(targetPos, 0.15);
+                        p.scale.set(1, 1, 1);
+                        p.material.emissiveIntensity = 0.2;
+                    });
+
+                    petals.forEach((petal) => {
+                        petal.position.applyAxisAngle(new THREE.Vector3(0,1,0), petal.userData.orbitSpeed);
+                        petal.rotation.x += petal.userData.rotSpeed.x;
+                        petal.rotation.y += petal.userData.rotSpeed.y;
+                        petal.rotation.z += petal.userData.rotSpeed.z;
+                        petal.material.emissiveIntensity = 0.1;
+                    });
+
+                    // Idle state for Bottom Crimson Bars
+                    rBars.forEach((bar) => {
+                        bar.scale.y += (0.1 - bar.scale.y) * 0.1;
+                        bar.material.emissiveIntensity = 0.2;
+                    });
+                } else if (currentMode === 2) {
+                    raveGroup.rotation.y = Math.sin(time * 0.2) * 0.1;
+                    
+                    raveTiles.forEach(t => t.material.emissive.lerp(new THREE.Color(0x000000), 0.05));
+                    speakers.forEach(s => {
+                        s.woofer.scale.y += (1 - s.woofer.scale.y)*0.1;
+                        s.woofer.material.emissiveIntensity = 0;
+                        s.tweeter.scale.y += (1 - s.tweeter.scale.y)*0.1;
+                    });
+                    lasers.forEach(l => {
+                        l.rotation.z = Math.sin(time) * 0.2;
+                        l.material.opacity = 0.1;
+                    });
+
+                    dancers.forEach((dancer, index) => {
+                        const d = dancer.userData;
+                        dancer.position.y += (0 - dancer.position.y) * 0.1; // Settle to ground
+                        
+                        // Gentle idle sway
+                        d.armL.rotation.x = Math.sin(time * 2 + index) * 0.2;
+                        d.armR.rotation.x = -Math.sin(time * 2 + index) * 0.2;
+                        d.legL.rotation.x = 0;
+                        d.legR.rotation.x = 0;
+                        d.head.scale.set(1,1,1);
+                        d.body.material.emissiveIntensity = 0.2;
+                    });
+                } else if (currentMode === 3) {
+                    const breath = Math.sin(time * 3) * 0.1;
+                    heart.scale.lerp(new THREE.Vector3(1 + breath, 1 + breath, 1 + breath), 0.1);
+                    cage.rotation.y -= 0.003;
+                    mandalaGroup.rotation.y += 0.001;
+
+                    crystals.forEach((crystal) => {
+                        const ripple = Math.sin(crystal.userData.ring * 0.4 - time * 6) * 1.5 + 2.0; // Sped up idle animation
+                        const angularWave = Math.sin(crystal.userData.angle * 4 + time * 4) * 0.5;
+                        crystal.scale.y += ((ripple + angularWave) - crystal.scale.y) * 0.1; 
+                        
+                        // Smoothly reset the tilt rotation when idle
+                        crystal.rotation.x += (0 - crystal.rotation.x) * 0.05;
+                        crystal.rotation.z += (0 - crystal.rotation.z) * 0.05;
+                        crystal.rotation.y += 0.005; // Gentle constant spin
+
+                        crystal.material.emissiveIntensity = 0.1 + (crystal.scale.y / 15) * 0.5;
+                    });
+
+                    // Idle Cosmic Stars
+                    auraStars.forEach((star) => {
+                        star.userData.angle += star.userData.speed;
+                        star.position.x = Math.cos(star.userData.angle) * star.userData.radius;
+                        star.position.z = Math.sin(star.userData.angle) * star.userData.radius;
+                        
+                        // Gentle floating bob effect
+                        const bob = Math.sin(time * 2 + star.userData.radius) * 1.5;
+                        star.position.y += (star.userData.baseY + bob - star.position.y) * 0.05;
+                        
+                        // Reset scales and rotations
+                        star.scale.lerp(new THREE.Vector3(1, 1, 1), 0.05);
+                        star.rotation.x += 0.005;
+                        star.rotation.y += 0.005;
+                        star.material.emissiveIntensity = 0.1;
+                    });
+                }
+            }
+
+            // Animate Embers (Particles) - NOW SYNCED WITH BEAT BUBBLES
+            const positions = particleMesh.geometry.attributes.position.array;
+            for(let i=1; i < particleCount * 3; i+=3) {
+                positions[i] += velocityArray[Math.floor(i/3)] * particleSpeedMult; // Float up fast on beat
+                if(positions[i] > 35) positions[i] = -2; // Reset loop
+                // Sway horizontally based on particle burst speed
+                positions[i-1] += Math.sin(time + positions[i]*0.1) * 0.015 * Math.max(1, particleSpeedMult * 0.2); 
+            }
+            particleMesh.geometry.attributes.position.needsUpdate = true;
+            particleMesh.rotation.y += 0.0005 * particleSpeedMult; // Spin faster on beat
+
+            // Cinematic Camera Orbit
+            const camOrbitRadius = 36;
+            let camX = Math.sin(time * 0.2) * camOrbitRadius;
+            let camY = 16 + Math.sin(time * 0.4) * 2; 
+            let camZ = Math.cos(time * 0.2) * camOrbitRadius;
+
+            // Apply soft beat-bounce
+            if (cameraShake > 0) {
+                camY += cameraShake * 1.5;
+                cameraShake *= 0.85; 
+            }
+
+            camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.05);
+            camera.lookAt(0, 3, 0); 
+
+            renderer.render(scene, camera);
+        }
+
+        // Helper function for averaging frequency bands
+        function getAverage(arr, start, end) {
+            let sum = 0;
+            for (let i = start; i < end; i++) {
+                sum += arr[i];
+            }
+            return sum / (end - start);
+        }
+
+        // Handle Window Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }, false);
+
+        // Start Animation
+        animate();
+    </script>
+</body>
+</html>
